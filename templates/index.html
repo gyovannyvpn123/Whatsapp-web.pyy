@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Web Python Interface</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #00a884;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected { background-color: #16a34a; }
+        .status-disconnected { background-color: #dc2626; }
+        .status-connecting { background-color: #f59e0b; }
+        
+        .qr-section {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .qr-code {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 2px dashed #d1d5db;
+        }
+        
+        .controls {
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #00a884;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #00916f;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+        
+        .messages-section {
+            padding: 20px;
+        }
+        
+        .message-form {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-form input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+        }
+        
+        .messages-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+        
+        .message {
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .message:last-child {
+            border-bottom: none;
+        }
+        
+        .message-content {
+            flex: 1;
+        }
+        
+        .message-meta {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f4f6;
+            border-radius: 50%;
+            border-top-color: #00a884;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WhatsApp Web Python Interface</h1>
+            <div>
+                <span id="status-text">{{ status }}</span>
+            </div>
+        </div>
+        
+        <div class="status">
+            <div>
+                <span class="status-indicator {% if connected %}status-connected{% else %}status-disconnected{% endif %}"></span>
+                <span>Status: <span id="current-status">{{ status }}</span></span>
+            </div>
+            <div>
+                <span id="message-count">0</span> messages
+            </div>
+        </div>
+        
+        <div class="qr-section" id="qr-section" {% if not qr_data %}style="display: none;"{% endif %}>
+            <h3>Scan QR Code with WhatsApp</h3>
+            <div class="qr-code" id="qr-display">
+                {% if qr_data %}
+                    <p>QR Code Data: {{ qr_data }}</p>
+                    <p><small>Use a QR code generator to create the image, or check the API endpoint /api/qr</small></p>
+                {% else %}
+                    <p>No QR code available</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="connect()">Connect</button>
+            <button class="btn btn-secondary" onclick="disconnect()">Disconnect</button>
+            <button class="btn btn-danger" onclick="clearSession()">Clear Session</button>
+            <button class="btn btn-secondary" onclick="refreshStatus()">Refresh</button>
+        </div>
+        
+        <div class="messages-section">
+            <h3>Send Message</h3>
+            <div class="message-form">
+                <input type="text" id="jid-input" placeholder="JID (e.g., 1234567890@s.whatsapp.net)" />
+                <input type="text" id="message-input" placeholder="Message text" />
+                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
+            
+            <h3>Recent Messages</h3>
+            <div class="messages-list" id="messages-list">
+                <div style="padding: 20px; text-align: center; color: #6b7280;">
+                    No messages yet
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusUpdateInterval;
+        let messageUpdateInterval;
+        
+        // Start auto-refresh
+        window.onload = function() {
+            refreshStatus();
+            refreshMessages();
+            
+            // Auto-refresh every 3 seconds
+            statusUpdateInterval = setInterval(refreshStatus, 3000);
+            messageUpdateInterval = setInterval(refreshMessages, 5000);
+        };
+        
+        async function connect() {
+            try {
+                const response = await fetch('/api/connect', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Connection started successfully!');
+                } else {
+                    alert('Failed to start connection: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function disconnect() {
+            try {
+                const response = await fetch('/api/disconnect', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Disconnected successfully!');
+                } else {
+                    alert('Failed to disconnect: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function clearSession() {
+            if (confirm('Are you sure you want to clear the saved session?')) {
+                try {
+                    const response = await fetch('/api/clear_session', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Session cleared successfully!');
+                    } else {
+                        alert('Failed to clear session: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            }
+        }
+        
+        async function sendMessage() {
+            const jid = document.getElementById('jid-input').value;
+            const message = document.getElementById('message-input').value;
+            
+            if (!jid || !message) {
+                alert('Please enter both JID and message');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jid, message })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Message sent successfully!');
+                    document.getElementById('message-input').value = '';
+                } else {
+                    alert('Failed to send message: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // Update status display
+                document.getElementById('current-status').textContent = data.status;
+                document.getElementById('message-count').textContent = data.message_count;
+                
+                // Update status indicator
+                const indicator = document.querySelector('.status-indicator');
+                indicator.className = 'status-indicator';
+                if (data.connected) {
+                    indicator.classList.add('status-connected');
+                } else if (data.status.includes('Connecting')) {
+                    indicator.classList.add('status-connecting');
+                } else {
+                    indicator.classList.add('status-disconnected');
+                }
+                
+                // Update QR section
+                const qrSection = document.getElementById('qr-section');
+                if (data.has_qr) {
+                    qrSection.style.display = 'block';
+                    // Fetch QR data
+                    fetchQRCode();
+                } else {
+                    qrSection.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+            }
+        }
+        
+        async function fetchQRCode() {
+            try {
+                const response = await fetch('/api/qr');
+                const data = await response.json();
+                
+                if (data.qr_data) {
+                    document.getElementById('qr-display').innerHTML = `
+                        <p><strong>QR Code Data:</strong></p>
+                        <p style="word-break: break-all; font-family: monospace; background: #f3f4f6; padding: 10px; border-radius: 4px;">
+                            ${data.qr_data}
+                        </p>
+                        <p><small>Use any QR code generator to create an image from this data</small></p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error fetching QR code:', error);
+            }
+        }
+        
+        async function refreshMessages() {
+            try {
+                const response = await fetch('/api/messages?limit=20');
+                const data = await response.json();
+                
+                const messagesList = document.getElementById('messages-list');
+                
+                if (data.messages && data.messages.length > 0) {
+                    messagesList.innerHTML = data.messages.map(msg => `
+                        <div class="message">
+                            <div class="message-content">
+                                <div><strong>${msg.type}</strong> ${msg.from_me ? '(sent)' : '(received)'}</div>
+                                <div>${msg.content}</div>
+                                <div class="message-meta">
+                                    From: ${msg.jid} | ${msg.datetime}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    messagesList.innerHTML = `
+                        <div style="padding: 20px; text-align: center; color: #6b7280;">
+                            No messages yet
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error refreshing messages:', error);
+            }
+        }
+    </script>
+</body>
+</html>
