@@ -1,0 +1,19 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.11.18",
+    "cryptography>=45.0.2",
+    "flask>=3.1.1",
+    "pathlib>=1.0.1",
+    "pillow>=11.2.1",
+    "protobuf>=6.31.0",
+    "pycryptodome>=3.23.0",
+    "pyqrcode>=1.2.1",
+    "requests>=2.32.3",
+    "websocket-client>=1.8.0",
+    "websockets>=15.0.1",
+    "werkzeug>=3.1.3",
+]
